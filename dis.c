@@ -1,0 +1,297 @@
+// Reference: 4-1 in Intel's 8080 Microprocessor System User's Manual
+
+//#include <sys/types.h>
+#include <sys/stat.h> // fstat
+#include <fcntl.h> // open
+#include <stdio.h> // printf
+#include <sys/mman.h> // mmap
+
+int dissasemble(unsigned char* bytecode, const int pc) {
+	int is; // instruction size
+
+	printf("%04X: ", pc);
+	switch(bytecode[pc]) {
+		case 0x00: printf("NOP"); is=1; break;
+		case 0x01: printf("LXI B,$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0x02: printf("STAX B"); is=1; break;
+		case 0x03: printf("INX B"); is=1; break;
+		case 0x04: printf("INR B"); is=1; break;
+		case 0x05: printf("DCR B"); is=1; break;
+		case 0x06: printf("MVI B, $%02x", bytecode[pc+1]); is=2; break;
+		case 0x07: printf("RLC"); is=1; break;
+		case 0x08: printf("-"); is=1; break;
+		case 0x09: printf("DAD B"); is=1; break;
+		case 0x0a: printf("LDAX B"); is=1; break;
+		case 0x0b: printf("DCX B"); is=1; break;
+		case 0x0c: printf("INR C"); is=1; break;
+		case 0x0d: printf("DCR C"); is=1; break;
+		case 0x0e: printf("MVI C,$%02x", bytecode[pc+1]); is=2; break;
+		case 0x0f: printf("RRC"); is=1; break;
+		case 0x10: printf("-"); is=1; break;
+		case 0x11: printf("LXI D,$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0x12: printf("STAX D"); is=1; break;
+		case 0x13: printf("INX D"); is=1; break;
+		case 0x14: printf("INR D"); is=1; break;
+		case 0x15: printf("DCR D"); is=1; break;
+		case 0x16: printf("MVI D, $%02x", bytecode[pc+1]); is=2; break;
+		case 0x17: printf("RAL"); is=1; break;
+		case 0x18: printf("-"); is=1; break;
+		case 0x19: printf("DAD D"); is=1; break;
+		case 0x1a: printf("LDAX D"); is=1; break;
+		case 0x1b: printf("DCX D"); is=1; break;
+		case 0x1c: printf("INR E"); is=1; break;
+		case 0x1d: printf("DCR E"); is=1; break;
+		case 0x1e: printf("MVI E,$%02x", bytecode[pc+1]); is=2; break;
+		case 0x1f: printf("RAR"); is=1; break;
+		case 0x20: printf("RIM"); is=1; break;
+		case 0x21: printf("LXI H,$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0x22: printf("SHLD #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0x23: printf("INX H"); is=1; break;
+		case 0x24: printf("INR H"); is=1; break;
+		case 0x25: printf("DCR H"); is=1; break;
+		case 0x26: printf("MVI H,$%02x", bytecode[pc+1]); is=2; break;
+		case 0x27: printf("DAA"); is=1; break;
+		case 0x28: printf("-"); is=1; break;
+		case 0x29: printf("DAD H"); is=1; break;
+		case 0x2a: printf("LHLD #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0x2b: printf("DCX H"); is=1; break;
+		case 0x2c: printf("INR L"); is=1; break;
+		case 0x2d: printf("DCR L"); is=1; break;
+		case 0x2e: printf("MVI L, $%02x", bytecode[pc+1]); is=2; break;
+		case 0x2f: printf("CMA"); is=1; break;
+		case 0x30: printf("SIM"); is=1; break;
+		case 0x31: printf("LXI SP, $%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0x32: printf("STA #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0x33: printf("INX SP"); is=1; break;
+		case 0x34: printf("INR M"); is=1; break;
+		case 0x35: printf("DCR M"); is=1; break;
+		case 0x36: printf("MVI M,$%02x", bytecode[pc+1]); is=2; break;
+		case 0x37: printf("STC"); is=1; break;
+		case 0x38: printf("-"); is=1; break;
+		case 0x39: printf("DAD SP"); is=1; break;
+		case 0x3a: printf("LDA #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0x3b: printf("DCX SP"); is=1; break;
+		case 0x3c: printf("INR A"); is=1; break;
+		case 0x3d: printf("DCR A"); is=1; break;
+		case 0x3e: printf("MVI A,$%02x", bytecode[pc+1]); is=2; break;
+		case 0x3f: printf("CMC"); is=1; break;
+		case 0x40: printf("MOV B,B"); is=1; break;
+		case 0x41: printf("MOV B,C"); is=1; break;
+		case 0x42: printf("MOV B,D"); is=1; break;
+		case 0x43: printf("MOV B,E"); is=1; break;
+		case 0x44: printf("MOV B,H"); is=1; break;
+		case 0x45: printf("MOV B,L"); is=1; break;
+		case 0x46: printf("MOV B,M"); is=1; break;
+		case 0x47: printf("MOV B,A"); is=1; break;
+		case 0x48: printf("MOV C,B"); is=1; break;
+		case 0x49: printf("MOV C,C"); is=1; break;
+		case 0x4a: printf("MOV C,D"); is=1; break;
+		case 0x4b: printf("MOV C,E"); is=1; break;
+		case 0x4c: printf("MOV C,H"); is=1; break;
+		case 0x4d: printf("MOV C,L"); is=1; break;
+		case 0x4e: printf("MOV C,M"); is=1; break;
+		case 0x4f: printf("MOV C,A"); is=1; break;
+		case 0x50: printf("MOV D,B"); is=1; break;
+		case 0x51: printf("MOV D,C"); is=1; break;
+		case 0x52: printf("MOV D,D"); is=1; break;
+		case 0x53: printf("MOV D,E"); is=1; break;
+		case 0x54: printf("MOV D,H"); is=1; break;
+		case 0x55: printf("MOV D,L"); is=1; break;
+		case 0x56: printf("MOV D,M"); is=1; break;
+		case 0x57: printf("MOV D,A"); is=1; break;
+		case 0x58: printf("MOV E,B"); is=1; break;
+		case 0x59: printf("MOV E,C"); is=1; break;
+		case 0x5a: printf("MOV E,D"); is=1; break;
+		case 0x5b: printf("MOV E,E"); is=1; break;
+		case 0x5c: printf("MOV E,H"); is=1; break;
+		case 0x5d: printf("MOV E,L"); is=1; break;
+		case 0x5e: printf("MOV E,M"); is=1; break;
+		case 0x5f: printf("MOV E,A"); is=1; break;
+		case 0x60: printf("MOV H,B"); is=1; break;
+		case 0x61: printf("MOV H,C"); is=1; break;
+		case 0x62: printf("MOV H,D"); is=1; break;
+		case 0x63: printf("MOV H,E"); is=1; break;
+		case 0x64: printf("MOV H,H"); is=1; break;
+		case 0x65: printf("MOV H,L"); is=1; break;
+		case 0x66: printf("MOV H,M"); is=1; break;
+		case 0x67: printf("MOV H,A"); is=1; break;
+		case 0x68: printf("MOV L,B"); is=1; break;
+		case 0x69: printf("MOV L,C"); is=1; break;
+		case 0x6a: printf("MOV L,D"); is=1; break;
+		case 0x6b: printf("MOV L,E"); is=1; break;
+		case 0x6c: printf("MOV L,H"); is=1; break;
+		case 0x6d: printf("MOV L,L"); is=1; break;
+		case 0x6e: printf("MOV L,M"); is=1; break;
+		case 0x6f: printf("MOV L,A"); is=1; break;
+		case 0x70: printf("MOV M,B"); is=1; break;
+		case 0x71: printf("MOV M,C"); is=1; break;
+		case 0x72: printf("MOV M,D"); is=1; break;
+		case 0x73: printf("MOV M,E"); is=1; break;
+		case 0x74: printf("MOV M,H"); is=1; break;
+		case 0x75: printf("MOV M,L"); is=1; break;
+		case 0x76: printf("HLT"); is=1; break;
+		case 0x77: printf("MOV M,A"); is=1; break;
+		case 0x78: printf("MOV A,B"); is=1; break;
+		case 0x79: printf("MOV A,C"); is=1; break;
+		case 0x7a: printf("MOV A,D"); is=1; break;
+		case 0x7b: printf("MOV A,E"); is=1; break;
+		case 0x7c: printf("MOV A,H"); is=1; break;
+		case 0x7d: printf("MOV A,L"); is=1; break;
+		case 0x7e: printf("MOV A,M"); is=1; break;
+		case 0x7f: printf("MOV A,A"); is=1; break;
+		case 0x80: printf("ADD B"); is=1; break;
+		case 0x81: printf("ADD C"); is=1; break;
+		case 0x82: printf("ADD D"); is=1; break;
+		case 0x83: printf("ADD E"); is=1; break;
+		case 0x84: printf("ADD H"); is=1; break;
+		case 0x85: printf("ADD L"); is=1; break;
+		case 0x86: printf("ADD M"); is=1; break;
+		case 0x87: printf("ADD A"); is=1; break;
+		case 0x88: printf("ADC B"); is=1; break;
+		case 0x89: printf("ADC C"); is=1; break;
+		case 0x8a: printf("ADC D"); is=1; break;
+		case 0x8b: printf("ADC E"); is=1; break;
+		case 0x8c: printf("ADC H"); is=1; break;
+		case 0x8d: printf("ADC L"); is=1; break;
+		case 0x8e: printf("ADC M"); is=1; break;
+		case 0x8f: printf("ADC A"); is=1; break;
+		case 0x90: printf("SUB B"); is=1; break;
+		case 0x91: printf("SUB C"); is=1; break;
+		case 0x92: printf("SUB D"); is=1; break;
+		case 0x93: printf("SUB E"); is=1; break;
+		case 0x94: printf("SUB H"); is=1; break;
+		case 0x95: printf("SUB L"); is=1; break;
+		case 0x96: printf("SUB M"); is=1; break;
+		case 0x97: printf("SUB A"); is=1; break;
+		case 0x98: printf("SBB B"); is=1; break;
+		case 0x99: printf("SBB C"); is=1; break;
+		case 0x9a: printf("SBB D"); is=1; break;
+		case 0x9b: printf("SBB E"); is=1; break;
+		case 0x9c: printf("SBB H"); is=1; break;
+		case 0x9d: printf("SBB L"); is=1; break;
+		case 0x9e: printf("SBB M"); is=1; break;
+		case 0x9f: printf("SBB A"); is=1; break;
+		case 0xa0: printf("ANA B"); is=1; break;
+		case 0xa1: printf("ANA C"); is=1; break;
+		case 0xa2: printf("ANA D"); is=1; break;
+		case 0xa3: printf("ANA E"); is=1; break;
+		case 0xa4: printf("ANA H"); is=1; break;
+		case 0xa5: printf("ANA L"); is=1; break;
+		case 0xa6: printf("ANA M"); is=1; break;
+		case 0xa7: printf("ANA A"); is=1; break;
+		case 0xa8: printf("XRA B"); is=1; break;
+		case 0xa9: printf("XRA C"); is=1; break;
+		case 0xaa: printf("XRA D"); is=1; break;
+		case 0xab: printf("XRA E"); is=1; break;
+		case 0xac: printf("XRA H"); is=1; break;
+		case 0xad: printf("XRA L"); is=1; break;
+		case 0xae: printf("XRA M"); is=1; break;
+		case 0xaf: printf("XRA A"); is=1; break;
+		case 0xb0: printf("ORA B"); is=1; break;
+		case 0xb1: printf("ORA C"); is=1; break;
+		case 0xb2: printf("ORA D"); is=1; break;
+		case 0xb3: printf("ORA E"); is=1; break;
+		case 0xb4: printf("ORA H"); is=1; break;
+		case 0xb5: printf("ORA L"); is=1; break;
+		case 0xb6: printf("ORA M"); is=1; break;
+		case 0xb7: printf("ORA A"); is=1; break;
+		case 0xb8: printf("CMP B"); is=1; break;
+		case 0xb9: printf("CMP C"); is=1; break;
+		case 0xba: printf("CMP D"); is=1; break;
+		case 0xbb: printf("CMP E"); is=1; break;
+		case 0xbc: printf("CMP H"); is=1; break;
+		case 0xbd: printf("CMP L"); is=1; break;
+		case 0xbe: printf("CMP M"); is=1; break;
+		case 0xbf: printf("CMP A"); is=1; break;
+		case 0xc0: printf("RNZ"); is=1; break;
+		case 0xc1: printf("POP B"); is=1; break;
+		case 0xc2: printf("JNZ #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xc3: printf("JMP #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xc4: printf("CNZ #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xc5: printf("PUSH B"); is=1; break;
+		case 0xc6: printf("ADI $%02x", bytecode[pc+1]); is=2; break;
+		case 0xc7: printf("RST 0"); is=1; break;
+		case 0xc8: printf("RZ"); is=1; break;
+		case 0xc9: printf("RET"); is=1; break;
+		case 0xca: printf("JZ #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xcb: printf("-"); is=1; break;
+		case 0xcc: printf("CZ #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xcd: printf("CALL #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xce: printf("ACI $%02x", bytecode[pc+1]); is=2; break;
+		case 0xcf: printf("RST 1"); is=1; break;
+		case 0xd0: printf("RNC"); is=1; break;
+		case 0xd1: printf("POP D"); is=1; break;
+		case 0xd2: printf("JNC #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xd3: printf("OUT $%02x", bytecode[pc+1]); is=2; break;
+		case 0xd4: printf("CNC #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xd5: printf("PUSH D"); is=1; break;
+		case 0xd6: printf("SUI $%02x", bytecode[pc+1]); is=2; break;
+		case 0xd7: printf("RST 2"); is=1; break;
+		case 0xd8: printf("RC"); is=1; break;
+		case 0xd9: printf("-"); is=1; break;
+		case 0xda: printf("JC #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xdb: printf("IN $%02x", bytecode[pc+1]); is=2; break;
+		case 0xdc: printf("CC #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xdd: printf("-"); is=1; break;
+		case 0xde: printf("SBI $%02x", bytecode[pc+1]); is=2; break;
+		case 0xdf: printf("RST 3"); is=1; break;
+		case 0xe0: printf("RPO"); is=1; break;
+		case 0xe1: printf("POP H"); is=1; break;
+		case 0xe2: printf("JPO #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xe3: printf("XTHL"); is=1; break;
+		case 0xe4: printf("CPO #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xe5: printf("PUSH H"); is=1; break;
+		case 0xe6: printf("ANI $%02x", bytecode[pc+1]); is=2; break;
+		case 0xe7: printf("RST 4"); is=1; break;
+		case 0xe8: printf("RPE"); is=1; break;
+		case 0xe9: printf("PCHL"); is=1; break;
+		case 0xea: printf("JPE #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xeb: printf("XCHG"); is=1; break;
+		case 0xec: printf("CPE #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xed: printf("-"); is=1; break;
+		case 0xee: printf("XRI $%02x", bytecode[pc+1]); is=2; break;
+		case 0xef: printf("RST 5"); is=1; break;
+		case 0xf0: printf("RP"); is=1; break;
+		case 0xf1: printf("POP PSW"); is=1; break;
+		case 0xf2: printf("JP #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xf3: printf("DI"); is=1; break;
+		case 0xf4: printf("CP #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xf5: printf("PUSH PSW"); is=1; break;
+		case 0xf6: printf("ORI $%02x", bytecode[pc+1]); is=2; break;
+		case 0xf7: printf("RST 6"); is=1; break;
+		case 0xf8: printf("RM"); is=1; break;
+		case 0xf9: printf("SPHL"); is=1; break;
+		case 0xfa: printf("JM #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xfb: printf("EI"); is=1; break;
+		case 0xfc: printf("CM #$%02x%02x", bytecode[pc+2], bytecode[pc+1]); is=3; break;
+		case 0xfd: printf("-"); is=1; break;
+		case 0xfe: printf("CPI $%02x", bytecode[pc+1]); is=2; break;
+		case 0xff: printf("RST 7"); is=1; break;
+	}
+	printf("\n");
+
+	return is;
+}
+
+int main(int argc, char** argv) {
+	const int fd = open(argv[1], O_RDONLY);
+
+	if(fd < 0) {
+		printf("Failed to open %s\n", argv[1]);
+		return 1;
+	}
+
+	struct stat sb;
+	if(fstat(fd, &sb) == -1) {
+		printf("Couldn't get file size of %s\n", argv[1]);
+		return 1;
+	}
+
+	unsigned char* bytecode = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	if(bytecode == MAP_FAILED) {
+		printf("Couldn't mmap %s\n", argv[1]);
+		return 1;
+	}
+
+	for(int pc = 0;pc < sb.st_size;pc += dissasemble(bytecode, pc));
+}
