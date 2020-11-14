@@ -26,6 +26,7 @@ void setFlag(struct i8080* cpu, const uint8_t flag, const uint8_t val) {
 void unimplemented(struct i8080* cpu, uint8_t* memory) {
 	printf("Unimplemented instruction, pc=%02x, mem[pc]=%02x\n", cpu->pc, memory[cpu->pc]);
 	cpu->halted = 1;
+	exit(1);
 }
 
 uint8_t parity(uint8_t val) {
@@ -42,7 +43,7 @@ uint8_t parity(uint8_t val) {
 void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t,uint8_t)) {
 	// TODO DCR does not set AC flag at all
 #define SWAP(x,y) ({x^=y;y^=x;x^=y;})
-#define D16 (b[2] << 8 | b[1]);
+#define D16 (b[2] << 8 | b[1])
 #define gBC rpBC(cpu)
 #define gDE rpDE(cpu)
 #define gHL rpHL(cpu)
@@ -59,6 +60,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 	uint8_t* b = memory + cpu->pc;
 	// setFlag(cpu, CY, cpu->B == 0); // will result in a borrow
 
+	uint8_t bit;
 	switch(b[0]) {
 /*NOP*/	case 0x00: /* do nothing :D */; cpu->pc += 1; break;
 /*LXI*/	case 0x01: cpu->B = b[2]; cpu->C = b[1]; cpu->pc += 3; break;
@@ -75,7 +77,13 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 		case 0x0c: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*DCR*/	case 0x0d: cpu->C --; fZ(cpu->C); fS(cpu->C); fP(cpu->C); cpu->pc += 1; break;
 /*MVI*/ case 0x0e: cpu->C = b[1]; cpu->pc += 2; break;
-		case 0x0f: unimplemented(cpu, memory); cpu->pc += 1; break;
+		case 0x0f:
+			bit = cpu->A & 1;
+			cpu->A >>= 1;
+			cpu->A |= (bit << 8);
+			setFlag(cpu, CY, bit);
+			cpu->pc += 1;
+			break;
 		case 0x10: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*LXI*/	case 0x11: cpu->D = b[2]; cpu->E = b[1]; cpu->pc += 3; break;
 		case 0x12: unimplemented(cpu, memory); cpu->pc += 1; break;
@@ -110,7 +118,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 		case 0x2f: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0x30: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*LXI*/	case 0x31: cpu->sp = D16; cpu->pc += 3; break;
-		case 0x32: unimplemented(cpu, memory); cpu->pc += 3; break;
+/*STA*/ case 0x32: memory[D16] = cpu->A; cpu->pc += 3; break;
 /*INX*/	case 0x33: cpu->sp ++; cpu->pc += 1; break;
 		case 0x34: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*DCR*/	case 0x35: memory[gHL] --; fZ(memory[gHL]); fS(memory[gHL]); fP(memory[gHL]); cpu->pc += 1; break;
@@ -118,7 +126,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 		case 0x37: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0x38: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*DAD*/	case 0x39: DAD(cpu->sp); cpu->pc += 1; break;
-		case 0x3a: unimplemented(cpu, memory); cpu->pc += 3; break;
+/*LDA*/	case 0x3a: cpu->A = memory[D16]; cpu->pc += 3; break;
 		case 0x3b: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0x3c: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*DCR*/	case 0x3d: cpu->A --; fZ(cpu->A); fS(cpu->A); fP(cpu->A); cpu->pc += 1; break;
@@ -277,7 +285,12 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 			cpu->sp -= 2;
 			cpu->pc += 1;
 		break;
-		case 0xc6: unimplemented(cpu, memory); cpu->pc += 2; break;
+/*ADI*/	case 0xc6:
+		setFlag(cpu, CY, cpu->A > 255 - b[1]);
+		cpu->A += b[1];
+		fZ(cpu->A); fS(cpu->A); fP(cpu->A);
+		cpu->pc += 2;
+		break;
 		case 0xc7: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xc8: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*RET*/	case 0xc9:
@@ -329,7 +342,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 			cpu->sp -= 2;
 			cpu->pc += 1;
 		break;
-		case 0xe6: unimplemented(cpu, memory); cpu->pc += 2; break;
+		case 0xe6: cpu->A &= b[1]; setFlag(cpu, CY, 0); cpu->pc += 2; break;
 		case 0xe7: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xe8: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xe9: unimplemented(cpu, memory); cpu->pc += 1; break;
@@ -339,15 +352,32 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 		case 0xed: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xee: unimplemented(cpu, memory); cpu->pc += 2; break;
 		case 0xef: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xf0: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xf1: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RP*/	case 0xf0:
+			if(getFlag(cpu, P)) {
+				printf("HERE %02x %02x\n", memory[cpu->sp+1], memory[cpu->sp]);
+				cpu->pc = ((uint16_t)memory[cpu->sp+1] << 8) | memory[cpu->sp];
+				cpu->sp += 2;
+			} else {
+				cpu->pc += 1;
+			}
+			break;
+/*POP*/	case 0xf1: // POP PSW
+			cpu->A = memory[cpu->sp+1];
+			setFlag(cpu, CY, (memory[cpu->sp] >> 0) & 1);
+			setFlag(cpu, P , (memory[cpu->sp] >> 2) & 1);
+			setFlag(cpu, AC, (memory[cpu->sp] >> 4) & 1);
+			setFlag(cpu, Z , (memory[cpu->sp] >> 6) & 1);
+			setFlag(cpu, S , (memory[cpu->sp] >> 7) & 1);
+			cpu->sp += 2;
+			cpu->pc += 1;
+			break;
 		case 0xf2: unimplemented(cpu, memory); cpu->pc += 3; break;
 		case 0xf3: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xf4: unimplemented(cpu, memory); cpu->pc += 3; break;
 /*PUSH*/case 0xf5: // PUSH PSW - saves flags into memory
 			memory[cpu->sp-1] = cpu->A;
 			memory[cpu->sp-2] = (getFlag(cpu, CY) << 0)
-			                  | (1                << 1)
+			                  | (0                << 1) // TODO should be zero per intel docs
 			                  | (getFlag(cpu, P ) << 2)
 			                  | (0                << 3)
 			                  | (getFlag(cpu, AC) << 4) // TODO change to getFlag(cpu, AC) when AC is working correctly

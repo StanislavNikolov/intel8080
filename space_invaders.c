@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
 			SDL_UnlockTexture(texture);
 			SDL_RenderCopy(renderer, texture, NULL, NULL);
 			SDL_RenderPresent(renderer);
-			SDL_Delay(10);
+			SDL_Delay(12);
 		}
 		//debugp(&cpu);
 
@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
 	}
 
 	free(memory);
-	SDL_Delay(10000);
+	//SDL_Delay(10000);
 
 	SDL_DestroyWindow(window);
     SDL_Quit();
