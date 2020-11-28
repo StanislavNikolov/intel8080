@@ -2,6 +2,7 @@
 #include <fcntl.h> // open
 #include <sys/mman.h> // mmap
 #include <SDL2/SDL.h>
+#include <time.h>
 
 #include "8080.h"
 
@@ -18,7 +19,39 @@ void debugp(struct i8080* cpu) {
 }
 
 void out(uint8_t port, uint8_t data) {
-	printf("OUT %02x: %02x (%c)\n", port, data, data);
+	printf("OUT %02x: %02x\n", port, data);
+}
+
+void drawFBToSDL(uint8_t *fb, uint8_t *sdlbuf) {
+	// 7168 bytes to be read from the fb - 224x256 pixels, 1 bit per pixel
+
+	uint8_t pgid = 0;
+	for(int sdlx = 0;sdlx < 224;sdlx ++) {
+		for(int sdly = 255;sdly >= 0;sdly --) {
+			const int sdl_pixel_idx = sdly * 224 + sdlx;
+
+			const uint8_t fbColor = ( (*fb) >> pgid ) & 1;
+			pgid ++;
+
+			if(pgid == 8) {
+				fb ++;
+				pgid = 0;
+			}
+			/* I thought this would be faster:
+			 *
+			 *    fb += (pgid >> 3);
+			 *    pgid &= 0b0111;
+			 *
+			 * But it looks like my Ryzen 5 3500U is correctly predicting it
+			 * can be skipped when there is branching.
+			*/
+
+			sdlbuf[sdl_pixel_idx * 4 + 0] = fbColor * 255;
+			sdlbuf[sdl_pixel_idx * 4 + 1] = fbColor * 255;
+			sdlbuf[sdl_pixel_idx * 4 + 2] = fbColor * 255;
+			sdlbuf[sdl_pixel_idx * 4 + 3] = SDL_ALPHA_OPAQUE;
+		}
+	}
 }
 
 int main(int argc, char** argv) {
@@ -57,7 +90,8 @@ int main(int argc, char** argv) {
 	// SDL
 	SDL_Init(SDL_INIT_EVERYTHING);
 
-	const unsigned int texWidth = 256, texHeight = 224;
+	//const unsigned int texWidth = 256, texHeight = 224;
+	const unsigned int texWidth = 224, texHeight = 256;
 	SDL_Window* window = SDL_CreateWindow(
 		"space invaders emulator",
 		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
@@ -70,47 +104,70 @@ int main(int argc, char** argv) {
 	SDL_RendererInfo info;
 	SDL_GetRendererInfo(renderer, &info);
 	printf("Renderer name: %s\n", info.name);
+	/*
 	printf("Texture formats:\n");
 	for(int i = 0;i < info.num_texture_formats;i ++) {
 		printf("%s\n", SDL_GetPixelFormatName(info.texture_formats[i]));
 	}
+	*/
 
 	SDL_Texture* texture = SDL_CreateTexture(
 		renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
 		texWidth, texHeight
 	);
 
+	double total_time = 0;
+	int total_count = 0;
 	while(cpu.halted == 0) {
 		execute_instruction(&cpu, memory, out);
 
-		//printf("%d\n", cpu.instr);
 		if(cpu.instr % 1000 == 0) {
+			//printf("Rendering framebuffer with SDL\n");
+
 			SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 			SDL_RenderClear(renderer);
 
 			uint8_t* lockedPixels;
 			int pitch = 0;
 			SDL_LockTexture(texture, NULL, (void **) &lockedPixels, &pitch);
-			const int videoMemOffset = 0x2400;
-			const int pixelGroupCnt = 0x3fff - videoMemOffset + 1;
-			for(int pixelGroup = 0;pixelGroup <= pixelGroupCnt;pixelGroup ++) {
-				for(int pgid = 0;pgid < 8;pgid ++) {
-					const int texturePixelId = pixelGroup*8 + pgid;
-					const int pixColor = (memory[videoMemOffset + pixelGroup] >> pgid) & 1;
-					lockedPixels[texturePixelId*4 + 0] = pixColor * 255;
-					lockedPixels[texturePixelId*4 + 1] = pixColor * 255;
-					lockedPixels[texturePixelId*4 + 2] = pixColor * 255;
-					lockedPixels[texturePixelId*4 + 3] = SDL_ALPHA_OPAQUE;
-				}
-			}
+			clock_t begin = clock();
+			drawFBToSDL(memory + 0x2400, lockedPixels);
+			clock_t end = clock();
+			total_time += end - begin;
+			total_count ++;
+
 			SDL_UnlockTexture(texture);
 			SDL_RenderCopy(renderer, texture, NULL, NULL);
 			SDL_RenderPresent(renderer);
-			SDL_Delay(12);
+
+			if(total_count == 5000) {
+				printf("average time to render: %f ms.\n", total_time / CLOCKS_PER_SEC * 1000 / total_count);
+				total_count = 0;
+				total_time = 0;
+			}
+
+			//SDL_Delay(12);
 		}
-		//debugp(&cpu);
 
 		// TODO emulate input, interrupts
+		SDL_Event event;
+		while(SDL_PollEvent(&event)) {
+			switch(event.type) {
+				case SDL_KEYDOWN:
+					printf("Key press detected: %d\n", event.key.keysym.scancode);
+					break;
+
+				case SDL_KEYUP:
+					printf("Key release detected: %d\n", event.key.keysym.scancode);
+					break;
+				case SDL_WINDOWEVENT:
+					if(event.window.event == SDL_WINDOWEVENT_CLOSE) {
+						return 0;
+					}
+					break;
+				default: break;
+			}
+		}
 	}
 
 	free(memory);
