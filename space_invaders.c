@@ -37,6 +37,7 @@ void drawFBToSDL(uint8_t *fb, uint8_t *sdlbuf) {
 				fb ++;
 				pgid = 0;
 			}
+
 			/* I thought this would be faster:
 			 *
 			 *    fb += (pgid >> 3);
@@ -81,7 +82,6 @@ int main(int argc, char** argv) {
 
 	struct i8080 cpu;
 	memset(&cpu, 0, sizeof(struct i8080));
-	cpu.halted = 0;
 
 	uint8_t* memory = calloc(64000, sizeof(uint8_t));
 	// load executable into memory
@@ -116,40 +116,10 @@ int main(int argc, char** argv) {
 		texWidth, texHeight
 	);
 
-	double total_time = 0;
-	int total_count = 0;
-	while(cpu.halted == 0) {
-		execute_instruction(&cpu, memory, out);
-
-		if(cpu.instr % 1000 == 0) {
-			//printf("Rendering framebuffer with SDL\n");
-
-			SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-			SDL_RenderClear(renderer);
-
-			uint8_t* lockedPixels;
-			int pitch = 0;
-			SDL_LockTexture(texture, NULL, (void **) &lockedPixels, &pitch);
-			clock_t begin = clock();
-			drawFBToSDL(memory + 0x2400, lockedPixels);
-			clock_t end = clock();
-			total_time += end - begin;
-			total_count ++;
-
-			SDL_UnlockTexture(texture);
-			SDL_RenderCopy(renderer, texture, NULL, NULL);
-			SDL_RenderPresent(renderer);
-
-			if(total_count == 5000) {
-				printf("average time to render: %f ms.\n", total_time / CLOCKS_PER_SEC * 1000 / total_count);
-				total_count = 0;
-				total_time = 0;
-			}
-
-			//SDL_Delay(12);
-		}
-
-		// TODO emulate input, interrupts
+	clock_t begin = clock();
+	clock_t last_screen_interrupt = begin;
+	uint8_t screen_interrupt_parity = 0;
+	while(getFlag(&cpu, HLT) == 0) {
 		SDL_Event event;
 		while(SDL_PollEvent(&event)) {
 			switch(event.type) {
@@ -166,6 +136,32 @@ int main(int argc, char** argv) {
 					}
 					break;
 				default: break;
+			}
+		}
+
+		execute_instruction(&cpu, memory, out);
+
+		if(cpu.instr % 1000 != 0) continue;
+
+		clock_t now = clock();
+		if(now - last_screen_interrupt > 1.0/60/2 * CLOCKS_PER_SEC) {
+			last_screen_interrupt = now;
+			screen_interrupt_parity ++;
+			if(screen_interrupt_parity == 2) {
+				request_interrupt(&cpu, memory, 2);
+				screen_interrupt_parity = 0;
+
+				SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+				SDL_RenderClear(renderer);
+
+				uint8_t* lockedPixels;
+				int pitch = 0;
+				SDL_LockTexture(texture, NULL, (void **) &lockedPixels, &pitch);
+				drawFBToSDL(memory + 0x2400, lockedPixels);
+
+				SDL_UnlockTexture(texture);
+				SDL_RenderCopy(renderer, texture, NULL, NULL);
+				SDL_RenderPresent(renderer);
 			}
 		}
 	}

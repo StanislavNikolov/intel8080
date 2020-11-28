@@ -6,10 +6,11 @@ struct i8080 {
 	uint16_t sp, pc;
 	int clock_cnt;//TODO
 	int instr; // for debug purposes only
-	uint8_t halted;
+	uint8_t input_ports[256];
 };
 
-void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t,uint8_t));
+void execute_instruction(struct i8080 *cpu, uint8_t *memory, void (*out)(uint8_t,uint8_t));
+void request_interrupt(struct i8080 *cpu, uint8_t *memory, uint8_t RST);
 
 // for debugging purposes
 
@@ -20,6 +21,7 @@ enum flag {
 	CY, // carry
 	AC, // accumulator
 	EI, // interruputs enabled (not really a flag as per the 8080 manual)
+	HLT, // whether or not is halted
 };
 
 uint8_t getFlag(struct i8080* cpu, enum flag flag);

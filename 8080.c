@@ -15,17 +15,17 @@ void srpBC(struct i8080* cpu, uint16_t val) { cpu->B = (val&0xFF00)>>8; cpu->C =
 void srpDE(struct i8080* cpu, uint16_t val) { cpu->D = (val&0xFF00)>>8; cpu->E = val&0xFF; };
 void srpHL(struct i8080* cpu, uint16_t val) { cpu->H = (val&0xFF00)>>8; cpu->L = val&0xFF; };
 
-uint8_t getFlag(struct i8080* cpu, enum flag flag) {
+uint8_t getFlag(struct i8080 *cpu, enum flag flag) {
 	return (cpu->flags >> flag) & 1;
 }
-void setFlag(struct i8080* cpu, const uint8_t flag, const uint8_t val) {
+void setFlag(struct i8080 *cpu, const uint8_t flag, const uint8_t val) {
 	cpu->flags &= ~(1 << flag); // reset
 	cpu->flags |= (1 << flag) * val; // set
 }
 
-void unimplemented(struct i8080* cpu, uint8_t* memory) {
+void unimplemented(struct i8080 *cpu, uint8_t *memory) {
 	printf("Unimplemented instruction, pc=%02x, mem[pc]=%02x\n", cpu->pc, memory[cpu->pc]);
-	cpu->halted = 1;
+	setFlag(cpu, HLT, 1);
 	exit(1);
 }
 
@@ -40,9 +40,29 @@ uint8_t parity(uint8_t val) {
 	      ^ (val>>7)) & 1;
 }
 
-void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t,uint8_t)) {
+// RST 0 means "jump to 0x0", RST 1 means "vector to 0x8" and so on
+#define RST(n) { \
+		memory[cpu->sp-1] = (cpu->pc & 0xFF00) >> 8; \
+		memory[cpu->sp-2] = (cpu->pc & 0x00FF); \
+		cpu->sp -= 2; \
+		cpu->pc = n*8; \
+	}
+
+void request_interrupt(struct i8080 *cpu, uint8_t *memory, uint8_t RST_n) {
+	// if the CPU does not have interrupts enabled right now, ignore it
+	printf("Called %d\n", RST_n);
+	if(!getFlag(cpu, EI)) return;
+
+	printf("LETS GOO\n");
+	// disable interrupts
+	setFlag(cpu, EI, 0);
+
+	RST(RST_n);
+}
+
+void execute_instruction(struct i8080 *cpu, uint8_t *memory, void (*out)(uint8_t,uint8_t)) {
 	// TODO DCR does not set AC flag at all
-#define SWAP(x,y) ({x^=y;y^=x;x^=y;})
+#define SWAP(x,y) {x^=y;y^=x;x^=y;}
 #define D16 (b[2] << 8 | b[1])
 #define gBC rpBC(cpu)
 #define gDE rpDE(cpu)
@@ -55,10 +75,10 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 #define fS(x) setFlag(cpu, S, ((x)&0x80) >> 7)
 #define fP(x) setFlag(cpu, P, !parity((x)))
 
-#define DAD(x) ({setFlag(cpu, CY, gHL > 0xFFFF - x); sHL(gHL + x);})
+#define DAD(x) {setFlag(cpu, CY, gHL > 0xFFFF - x); sHL(gHL + x);}
 
-#define XRA(x) ({cpu->A^=x; fZ(cpu->A); fS(cpu->A); fP(cpu->A); setFlag(cpu, CY, 0); setFlag(cpu, AC, 0);})
-#define ANA(x) ({cpu->A&=x; fZ(cpu->A); fS(cpu->A); fP(cpu->A); setFlag(cpu, CY, 0); /* TODO AC */})
+#define XRA(x) {cpu->A^=x; fZ(cpu->A); fS(cpu->A); fP(cpu->A); setFlag(cpu, CY, 0); setFlag(cpu, AC, 0);}
+#define ANA(x) {cpu->A&=x; fZ(cpu->A); fS(cpu->A); fP(cpu->A); setFlag(cpu, CY, 0); /* TODO AC */}
 
 	uint8_t* b = memory + cpu->pc;
 	// setFlag(cpu, CY, cpu->B == 0); // will result in a borrow
@@ -297,7 +317,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 		fZ(cpu->A); fS(cpu->A); fP(cpu->A);
 		cpu->pc += 2;
 		break;
-		case 0xc7: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RST*/	case 0xc7: RST(0); break;
 		case 0xc8: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*RET*/	case 0xc9:
 			cpu->pc = ((uint16_t)memory[cpu->sp+1] << 8) | memory[cpu->sp];
@@ -315,7 +335,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 			cpu->pc = D16;
 		break;
 		case 0xce: unimplemented(cpu, memory); cpu->pc += 2; break;
-		case 0xcf: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RST*/	case 0xcf: RST(1); break;
 		case 0xd0: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*POP*/	case 0xd1: cpu->E=memory[cpu->sp]; cpu->D=memory[cpu->sp+1]; cpu->sp += 2; cpu->pc += 1; break;
 		case 0xd2: unimplemented(cpu, memory); cpu->pc += 3; break;
@@ -328,15 +348,15 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 			cpu->pc += 1;
 		break;
 		case 0xd6: unimplemented(cpu, memory); cpu->pc += 2; break;
-		case 0xd7: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RST*/	case 0xd7: RST(2); break;
 		case 0xd8: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xd9: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xda: unimplemented(cpu, memory); cpu->pc += 3; break;
-		case 0xdb: unimplemented(cpu, memory); cpu->pc += 2; break;
+/*IN*/	case 0xdb: printf("IN %02x\n", b[1]); cpu->A = cpu->input_ports[b[1]]; cpu->pc += 2; break;
 		case 0xdc: unimplemented(cpu, memory); cpu->pc += 3; break;
 		case 0xdd: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xde: unimplemented(cpu, memory); cpu->pc += 2; break;
-		case 0xdf: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RST*/	case 0xdf: RST(3); break;
 		case 0xe0: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*POP*/	case 0xe1: cpu->L=memory[cpu->sp]; cpu->H=memory[cpu->sp+1]; cpu->sp += 2; cpu->pc += 1; break;
 		case 0xe2: unimplemented(cpu, memory); cpu->pc += 3; break;
@@ -349,7 +369,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 			cpu->pc += 1;
 		break;
 		case 0xe6: cpu->A &= b[1]; setFlag(cpu, CY, 0); cpu->pc += 2; break;
-		case 0xe7: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RST*/	case 0xe7: RST(4); break;
 		case 0xe8: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xe9: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xea: unimplemented(cpu, memory); cpu->pc += 3; break;
@@ -357,7 +377,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 		case 0xec: unimplemented(cpu, memory); cpu->pc += 3; break;
 		case 0xed: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xee: unimplemented(cpu, memory); cpu->pc += 2; break;
-		case 0xef: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RST*/	case 0xef: RST(5); break;
 /*RP*/	case 0xf0:
 			if(getFlag(cpu, P)) {
 				printf("HERE %02x %02x\n", memory[cpu->sp+1], memory[cpu->sp]);
@@ -394,7 +414,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 			cpu->pc += 1;
 			break;
 		case 0xf6: unimplemented(cpu, memory); cpu->pc += 2; break;
-		case 0xf7: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RST*/	case 0xf7: RST(6); break;
 		case 0xf8: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xf9: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xfa: unimplemented(cpu, memory); cpu->pc += 3; break;
@@ -407,7 +427,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 			fZ(tmp); fS(tmp); fP(tmp);
 			cpu->pc += 2;
 		break;
-		case 0xff: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RST*/	case 0xff: RST(7); break;
 	}
 	cpu->instr ++;
 

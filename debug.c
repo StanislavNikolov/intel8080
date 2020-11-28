@@ -30,7 +30,7 @@ void debugp_other(struct State8080* cpu, char* buff) {
 }
 
 void out(uint8_t port, uint8_t data) {
-	printf("OUT %02x: %02x (%c)\n", port, data, data);
+	printf("OUT on port %02x: %02x\n", port, data);
 }
 
 int main(int argc, char** argv) {
@@ -75,28 +75,30 @@ int main(int argc, char** argv) {
 		execute_instruction(&cpu, memory, out);
 		Emulate8080Op(&cpu_2);
 
-		printf("===========\n");
+		if(cpu.instr % 1000 == 0) {
+			printf("Finished instruction %d\n", cpu.instr);
+		}
+
 		char* d8 = malloc(100);
 		char* ot = malloc(100);
 		debugp(&cpu, d8);
 		debugp_other(&cpu_2, ot);
-		printf("%s%s", d8, ot);
 
-		int diff = -1;
-		for(int i = 0;i < 64000;i ++) {
-			if(memory[i] != cpu_2.memory[i]) {
-				diff = i;
-				break;
-			}
-		}
-		if( strcmp(d8, ot) == 0 && diff == -1 ) {
-			printf("Memory is the same\n");
-		} else {
-			printf("Warn - memory different: %04x\n", diff);
-			printf("%02x | %02x\n", memory[diff], cpu_2.memory[diff]);
+		if(strcmp(d8, ot) != 0) {
+			printf("Error (at instruction %d) - cpu state is different\n", cpu.instr);
+			printf("%s%s", d8, ot);
 			return 1;
 		}
+
+		for(int i = 0;i < 64000;i ++) {
+			if(memory[i] != cpu_2.memory[i]) {
+				printf("Error (at instruction %d) - memory different at addr %04x\n", cpu.instr, i);
+				printf("%02x | %02x\n", memory[i], cpu_2.memory[i]);
+				printf("%s%s", d8, ot);
+				return 1;
+			}
+		}
+
 		//memcmp(memory, cpu_2.memory, 64000)
-		// TODO emulate fb, input, interrupts
 	}
 }
