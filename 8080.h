@@ -13,8 +13,17 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 
 // for debugging purposes
 
-enum flag {Z/*zero*/, S/*sign*/, P/*parity*/, CY/*carry*/, AC/*accumulator*/};
+enum flag {
+	Z,  // zero
+	S,  // sign
+	P,  // parity
+	CY, // carry
+	AC, // accumulator
+	EI, // interruputs enabled (not really a flag as per the 8080 manual)
+};
+
 uint8_t getFlag(struct i8080* cpu, enum flag flag);
+
 // get register pair
 uint16_t rpBC(struct i8080* cpu);
 uint16_t rpDE(struct i8080* cpu);

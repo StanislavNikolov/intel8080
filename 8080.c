@@ -7,9 +7,9 @@
 #include "8080.h"
 
 // get register pair
-uint16_t rpBC(struct i8080* cpu) { return cpu->B << 8 | cpu->C; };
-uint16_t rpDE(struct i8080* cpu) { return cpu->D << 8 | cpu->E; };
-uint16_t rpHL(struct i8080* cpu) { return cpu->H << 8 | cpu->L; };
+inline uint16_t rpBC(struct i8080* cpu) { return cpu->B << 8 | cpu->C; };
+inline uint16_t rpDE(struct i8080* cpu) { return cpu->D << 8 | cpu->E; };
+inline uint16_t rpHL(struct i8080* cpu) { return cpu->H << 8 | cpu->L; };
 // set register pair
 void srpBC(struct i8080* cpu, uint16_t val) { cpu->B = (val&0xFF00)>>8; cpu->C = val&0xFF; };
 void srpDE(struct i8080* cpu, uint16_t val) { cpu->D = (val&0xFF00)>>8; cpu->E = val&0xFF; };
@@ -56,6 +56,9 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 #define fP(x) setFlag(cpu, P, !parity((x)))
 
 #define DAD(x) ({setFlag(cpu, CY, gHL > 0xFFFF - x); sHL(gHL + x);})
+
+#define XRA(x) ({cpu->A^=x; fZ(cpu->A); fS(cpu->A); fP(cpu->A); setFlag(cpu, CY, 0); setFlag(cpu, AC, 0);})
+#define ANA(x) ({cpu->A&=x; fZ(cpu->A); fS(cpu->A); fP(cpu->A); setFlag(cpu, CY, 0); /* TODO AC */})
 
 	uint8_t* b = memory + cpu->pc;
 	// setFlag(cpu, CY, cpu->B == 0); // will result in a borrow
@@ -135,59 +138,59 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 
 /* block of a lot of MOVs */
 
-/*MOV*/	case 0x40: cpu->B = cpu->B; cpu->pc += 1; break;
-/*MOV*/	case 0x41: cpu->B = cpu->C; cpu->pc += 1; break;
-/*MOV*/	case 0x42: cpu->B = cpu->D; cpu->pc += 1; break;
-/*MOV*/	case 0x43: cpu->B = cpu->E; cpu->pc += 1; break;
-/*MOV*/	case 0x44: cpu->B = cpu->H; cpu->pc += 1; break;
-/*MOV*/	case 0x45: cpu->B = cpu->L; cpu->pc += 1; break;
+/*MOV*/	case 0x40: cpu->B = cpu->B;      cpu->pc += 1; break;
+/*MOV*/	case 0x41: cpu->B = cpu->C;      cpu->pc += 1; break;
+/*MOV*/	case 0x42: cpu->B = cpu->D;      cpu->pc += 1; break;
+/*MOV*/	case 0x43: cpu->B = cpu->E;      cpu->pc += 1; break;
+/*MOV*/	case 0x44: cpu->B = cpu->H;      cpu->pc += 1; break;
+/*MOV*/	case 0x45: cpu->B = cpu->L;      cpu->pc += 1; break;
 /*MOV*/	case 0x46: cpu->B = memory[gHL]; cpu->pc += 1; break;
-/*MOV*/	case 0x47: cpu->B = cpu->A; cpu->pc += 1; break;
+/*MOV*/	case 0x47: cpu->B = cpu->A;      cpu->pc += 1; break;
 
-/*MOV*/	case 0x48: cpu->C = cpu->B; cpu->pc += 1; break;
-/*MOV*/	case 0x49: cpu->C = cpu->C; cpu->pc += 1; break;
-/*MOV*/	case 0x4a: cpu->C = cpu->D; cpu->pc += 1; break;
-/*MOV*/	case 0x4b: cpu->C = cpu->E; cpu->pc += 1; break;
-/*MOV*/	case 0x4c: cpu->C = cpu->H; cpu->pc += 1; break;
-/*MOV*/	case 0x4d: cpu->C = cpu->L; cpu->pc += 1; break;
+/*MOV*/	case 0x48: cpu->C = cpu->B;      cpu->pc += 1; break;
+/*MOV*/	case 0x49: cpu->C = cpu->C;      cpu->pc += 1; break;
+/*MOV*/	case 0x4a: cpu->C = cpu->D;      cpu->pc += 1; break;
+/*MOV*/	case 0x4b: cpu->C = cpu->E;      cpu->pc += 1; break;
+/*MOV*/	case 0x4c: cpu->C = cpu->H;      cpu->pc += 1; break;
+/*MOV*/	case 0x4d: cpu->C = cpu->L;      cpu->pc += 1; break;
 /*MOV*/	case 0x4e: cpu->C = memory[gHL]; cpu->pc += 1; break;
-/*MOV*/	case 0x4f: cpu->C = cpu->A; cpu->pc += 1; break;
+/*MOV*/	case 0x4f: cpu->C = cpu->A;      cpu->pc += 1; break;
 
-/*MOV*/	case 0x50: cpu->D = cpu->B; cpu->pc += 1; break;
-/*MOV*/	case 0x51: cpu->D = cpu->C; cpu->pc += 1; break;
-/*MOV*/	case 0x52: cpu->D = cpu->D; cpu->pc += 1; break;
-/*MOV*/	case 0x53: cpu->D = cpu->E; cpu->pc += 1; break;
-/*MOV*/	case 0x54: cpu->D = cpu->H; cpu->pc += 1; break;
-/*MOV*/	case 0x55: cpu->D = cpu->L; cpu->pc += 1; break;
+/*MOV*/	case 0x50: cpu->D = cpu->B;      cpu->pc += 1; break;
+/*MOV*/	case 0x51: cpu->D = cpu->C;      cpu->pc += 1; break;
+/*MOV*/	case 0x52: cpu->D = cpu->D;      cpu->pc += 1; break;
+/*MOV*/	case 0x53: cpu->D = cpu->E;      cpu->pc += 1; break;
+/*MOV*/	case 0x54: cpu->D = cpu->H;      cpu->pc += 1; break;
+/*MOV*/	case 0x55: cpu->D = cpu->L;      cpu->pc += 1; break;
 /*MOV*/	case 0x56: cpu->D = memory[gHL]; cpu->pc += 1; break;
-/*MOV*/	case 0x57: cpu->D = cpu->A; cpu->pc += 1; break;
+/*MOV*/	case 0x57: cpu->D = cpu->A;      cpu->pc += 1; break;
 
-/*MOV*/	case 0x58: cpu->E = cpu->B; cpu->pc += 1; break;
-/*MOV*/	case 0x59: cpu->E = cpu->C; cpu->pc += 1; break;
-/*MOV*/	case 0x5a: cpu->E = cpu->D; cpu->pc += 1; break;
-/*MOV*/	case 0x5b: cpu->E = cpu->E; cpu->pc += 1; break;
-/*MOV*/	case 0x5c: cpu->E = cpu->H; cpu->pc += 1; break;
-/*MOV*/	case 0x5d: cpu->E = cpu->L; cpu->pc += 1; break;
+/*MOV*/	case 0x58: cpu->E = cpu->B;      cpu->pc += 1; break;
+/*MOV*/	case 0x59: cpu->E = cpu->C;      cpu->pc += 1; break;
+/*MOV*/	case 0x5a: cpu->E = cpu->D;      cpu->pc += 1; break;
+/*MOV*/	case 0x5b: cpu->E = cpu->E;      cpu->pc += 1; break;
+/*MOV*/	case 0x5c: cpu->E = cpu->H;      cpu->pc += 1; break;
+/*MOV*/	case 0x5d: cpu->E = cpu->L;      cpu->pc += 1; break;
 /*MOV*/	case 0x5e: cpu->E = memory[gHL]; cpu->pc += 1; break;
-/*MOV*/	case 0x5f: cpu->E = cpu->A; cpu->pc += 1; break;
+/*MOV*/	case 0x5f: cpu->E = cpu->A;      cpu->pc += 1; break;
 
-/*MOV*/	case 0x60: cpu->H = cpu->B; cpu->pc += 1; break;
-/*MOV*/	case 0x61: cpu->H = cpu->C; cpu->pc += 1; break;
-/*MOV*/	case 0x62: cpu->H = cpu->D; cpu->pc += 1; break;
-/*MOV*/	case 0x63: cpu->H = cpu->E; cpu->pc += 1; break;
-/*MOV*/	case 0x64: cpu->H = cpu->H; cpu->pc += 1; break;
-/*MOV*/	case 0x65: cpu->H = cpu->L; cpu->pc += 1; break;
+/*MOV*/	case 0x60: cpu->H = cpu->B;      cpu->pc += 1; break;
+/*MOV*/	case 0x61: cpu->H = cpu->C;      cpu->pc += 1; break;
+/*MOV*/	case 0x62: cpu->H = cpu->D;      cpu->pc += 1; break;
+/*MOV*/	case 0x63: cpu->H = cpu->E;      cpu->pc += 1; break;
+/*MOV*/	case 0x64: cpu->H = cpu->H;      cpu->pc += 1; break;
+/*MOV*/	case 0x65: cpu->H = cpu->L;      cpu->pc += 1; break;
 /*MOV*/	case 0x66: cpu->H = memory[gHL]; cpu->pc += 1; break;
-/*MOV*/	case 0x67: cpu->H = cpu->A; cpu->pc += 1; break;
+/*MOV*/	case 0x67: cpu->H = cpu->A;      cpu->pc += 1; break;
 
-/*MOV*/	case 0x68: cpu->L = cpu->B; cpu->pc += 1; break;
-/*MOV*/	case 0x69: cpu->L = cpu->C; cpu->pc += 1; break;
-/*MOV*/	case 0x6a: cpu->L = cpu->D; cpu->pc += 1; break;
-/*MOV*/	case 0x6b: cpu->L = cpu->E; cpu->pc += 1; break;
-/*MOV*/	case 0x6c: cpu->L = cpu->H; cpu->pc += 1; break;
-/*MOV*/	case 0x6d: cpu->L = cpu->L; cpu->pc += 1; break;
+/*MOV*/	case 0x68: cpu->L = cpu->B;      cpu->pc += 1; break;
+/*MOV*/	case 0x69: cpu->L = cpu->C;      cpu->pc += 1; break;
+/*MOV*/	case 0x6a: cpu->L = cpu->D;      cpu->pc += 1; break;
+/*MOV*/	case 0x6b: cpu->L = cpu->E;      cpu->pc += 1; break;
+/*MOV*/	case 0x6c: cpu->L = cpu->H;      cpu->pc += 1; break;
+/*MOV*/	case 0x6d: cpu->L = cpu->L;      cpu->pc += 1; break;
 /*MOV*/	case 0x6e: cpu->L = memory[gHL]; cpu->pc += 1; break;
-/*MOV*/	case 0x6f: cpu->L = cpu->A; cpu->pc += 1; break;
+/*MOV*/	case 0x6f: cpu->L = cpu->A;      cpu->pc += 1; break;
 
 /*MOV*/	case 0x70: memory[gHL] = cpu->B; cpu->pc += 1; break;
 /*MOV*/	case 0x71: memory[gHL] = cpu->C; cpu->pc += 1; break;
@@ -198,14 +201,14 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 /*HLT*/ case 0x76: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*MOV*/	case 0x77: memory[gHL] = cpu->A; cpu->pc += 1; break;
 
-/*MOV*/	case 0x78: cpu->A = cpu->B; cpu->pc += 1; break;
-/*MOV*/	case 0x79: cpu->A = cpu->C; cpu->pc += 1; break;
-/*MOV*/	case 0x7a: cpu->A = cpu->D; cpu->pc += 1; break;
-/*MOV*/	case 0x7b: cpu->A = cpu->E; cpu->pc += 1; break;
-/*MOV*/	case 0x7c: cpu->A = cpu->H; cpu->pc += 1; break;
-/*MOV*/	case 0x7d: cpu->A = cpu->L; cpu->pc += 1; break;
+/*MOV*/	case 0x78: cpu->A = cpu->B;      cpu->pc += 1; break;
+/*MOV*/	case 0x79: cpu->A = cpu->C;      cpu->pc += 1; break;
+/*MOV*/	case 0x7a: cpu->A = cpu->D;      cpu->pc += 1; break;
+/*MOV*/	case 0x7b: cpu->A = cpu->E;      cpu->pc += 1; break;
+/*MOV*/	case 0x7c: cpu->A = cpu->H;      cpu->pc += 1; break;
+/*MOV*/	case 0x7d: cpu->A = cpu->L;      cpu->pc += 1; break;
 /*MOV*/	case 0x7e: cpu->A = memory[gHL]; cpu->pc += 1; break;
-/*MOV*/	case 0x7f: cpu->A = cpu->A; cpu->pc += 1; break; // WTF why is this needed
+/*MOV*/	case 0x7f: cpu->A = cpu->A;      cpu->pc += 1; break; // WTF why is this needed
 
 		case 0x80: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0x81: unimplemented(cpu, memory); cpu->pc += 1; break;
@@ -239,22 +242,25 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 		case 0x9d: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0x9e: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0x9f: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa0: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa1: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa2: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa3: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa4: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa5: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa6: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa7: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa8: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xa9: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xaa: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xab: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xac: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xad: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xae: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xaf: unimplemented(cpu, memory); cpu->pc += 1; break;
+
+/*ANA*/	case 0xa0: ANA(cpu->B);      cpu->pc += 1; break;
+/*ANA*/	case 0xa1: ANA(cpu->C);      cpu->pc += 1; break;
+/*ANA*/	case 0xa2: ANA(cpu->D);      cpu->pc += 1; break;
+/*ANA*/	case 0xa3: ANA(cpu->E);      cpu->pc += 1; break;
+/*ANA*/	case 0xa4: ANA(cpu->H);      cpu->pc += 1; break;
+/*ANA*/	case 0xa5: ANA(cpu->L);      cpu->pc += 1; break;
+/*ANA*/	case 0xa6: ANA(memory[gHL]); cpu->pc += 1; break;
+/*ANA*/	case 0xa7: ANA(cpu->A);      cpu->pc += 1; break;
+
+/*XRA*/	case 0xa8: XRA(cpu->B);      cpu->pc += 1; break;
+/*XRA*/	case 0xa9: XRA(cpu->C);      cpu->pc += 1; break;
+/*XRA*/	case 0xaa: XRA(cpu->D);      cpu->pc += 1; break;
+/*XRA*/	case 0xab: XRA(cpu->E);      cpu->pc += 1; break;
+/*XRA*/	case 0xac: XRA(cpu->H);      cpu->pc += 1; break;
+/*XRA*/	case 0xad: XRA(cpu->L);      cpu->pc += 1; break;
+/*XRA*/	case 0xae: XRA(memory[gHL]); cpu->pc += 1; break;
+/*XRA*/	case 0xaf: XRA(cpu->A);      cpu->pc += 1; break;
+
 		case 0xb0: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xb1: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xb2: unimplemented(cpu, memory); cpu->pc += 1; break;
@@ -372,12 +378,12 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 			cpu->pc += 1;
 			break;
 		case 0xf2: unimplemented(cpu, memory); cpu->pc += 3; break;
-		case 0xf3: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*DI*/	case 0xf3: setFlag(cpu, EI, 0); cpu->pc += 1; break;
 		case 0xf4: unimplemented(cpu, memory); cpu->pc += 3; break;
 /*PUSH*/case 0xf5: // PUSH PSW - saves flags into memory
 			memory[cpu->sp-1] = cpu->A;
 			memory[cpu->sp-2] = (getFlag(cpu, CY) << 0)
-			                  | (0                << 1) // TODO should be zero per intel docs
+			                  | (0                << 1) // TODO should be 1 per intel docs
 			                  | (getFlag(cpu, P ) << 2)
 			                  | (0                << 3)
 			                  | (getFlag(cpu, AC) << 4) // TODO change to getFlag(cpu, AC) when AC is working correctly
@@ -392,7 +398,7 @@ void execute_instruction(struct i8080* cpu, uint8_t* memory, void (*out)(uint8_t
 		case 0xf8: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xf9: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xfa: unimplemented(cpu, memory); cpu->pc += 3; break;
-		case 0xfb: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*EI*/	case 0xfb: setFlag(cpu, EI, 1); cpu->pc += 1; break;
 		case 0xfc: unimplemented(cpu, memory); cpu->pc += 3; break;
 		case 0xfd: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*CPI*/	case 0xfe:
