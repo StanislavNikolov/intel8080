@@ -82,6 +82,15 @@ int main(int argc, char** argv) {
 
 	struct i8080 cpu;
 	memset(&cpu, 0, sizeof(struct i8080));
+	uint8_t credit = 1, p1start = 1, p2start = 1;
+	cpu.input_ports[0] = 0b00001110; // bits 1-3 should be always set
+	cpu.input_ports[1] = 0b00001000; // bit 3 should be always set
+	cpu.input_ports[2] = 0b00000000;
+
+	cpu.input_ports[2] |= credit;
+	cpu.input_ports[2] |= p1start << 2;
+	cpu.input_ports[2] |= p2start << 1;
+
 
 	uint8_t* memory = calloc(64000, sizeof(uint8_t));
 	// load executable into memory
@@ -119,11 +128,13 @@ int main(int argc, char** argv) {
 	clock_t begin = clock();
 	clock_t last_screen_interrupt = begin;
 	uint8_t screen_interrupt_parity = 0;
+	uint8_t debug = 0;
 	while(getFlag(&cpu, HLT) == 0) {
 		SDL_Event event;
 		while(SDL_PollEvent(&event)) {
 			switch(event.type) {
 				case SDL_KEYDOWN:
+					debug = !debug;
 					printf("Key press detected: %d\n", event.key.keysym.scancode);
 					break;
 
@@ -140,6 +151,8 @@ int main(int argc, char** argv) {
 		}
 
 		execute_instruction(&cpu, memory, out);
+		if(debug) {
+		}
 
 		if(cpu.instr % 1000 != 0) continue;
 

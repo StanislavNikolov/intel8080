@@ -288,7 +288,8 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	int pc = 0;
+	printf("DELETEME\n");
+	int pc = 0x100;
 	while(pc < sb.st_size) {
 		// the 8080 has 16 bit address space
 		printf("%04X: ", pc);

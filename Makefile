@@ -6,6 +6,8 @@ space_invaders: 8080.o space_invaders.o
 
 debug: 8080.o debug.o other.o
 
+run: 8080.o run.o
+
 space_invaders.o: space_invaders.c
 	$(CC) $(CFLAGS) -c space_invaders.c -o space_invaders.o
 
@@ -14,6 +16,9 @@ space_invaders.o: space_invaders.c
 
 debug.o: debug.c
 	$(CC) $(CFLAGS) -c debug.c -o debug.o
+
+run.o: run.c
+	$(CC) $(CFLAGS) -c run.c -o run.o
 
 other.o: other.c
 	$(CC) $(CFLAGS) -c other.c -o other.o

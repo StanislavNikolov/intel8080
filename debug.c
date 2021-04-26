@@ -60,7 +60,6 @@ int main(int argc, char** argv) {
 
 	struct i8080 cpu;
 	memset(&cpu, 0, sizeof(struct i8080));
-	cpu.sp = 0x100;
 
 	uint8_t* memory = calloc(64000, sizeof(uint8_t));
 	// load executable into memory
@@ -71,6 +70,9 @@ int main(int argc, char** argv) {
 	cpu_2.memory = calloc(64000, sizeof(uint8_t));
 	memcpy(cpu_2.memory, bytecode, sb.st_size);
 
+	char* d8 = malloc(100);
+	char* ot = malloc(100);
+
 	while(1) {
 		execute_instruction(&cpu, memory, out);
 		Emulate8080Op(&cpu_2);
@@ -79,10 +81,9 @@ int main(int argc, char** argv) {
 			printf("Finished instruction %d\n", cpu.instr);
 		}
 
-		char* d8 = malloc(100);
-		char* ot = malloc(100);
 		debugp(&cpu, d8);
 		debugp_other(&cpu_2, ot);
+		printf("--\n%s%s", d8, ot);
 
 		if(strcmp(d8, ot) != 0) {
 			printf("Error (at instruction %d) - cpu state is different\n", cpu.instr);

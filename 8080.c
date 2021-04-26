@@ -50,10 +50,10 @@ uint8_t parity(uint8_t val) {
 
 void request_interrupt(struct i8080 *cpu, uint8_t *memory, uint8_t RST_n) {
 	// if the CPU does not have interrupts enabled right now, ignore it
-	printf("Called %d\n", RST_n);
+	//printf("Called %d\n", RST_n);
 	if(!getFlag(cpu, EI)) return;
 
-	printf("LETS GOO\n");
+	//printf("LETS GOO\n");
 	// disable interrupts
 	setFlag(cpu, EI, 0);
 
@@ -61,7 +61,7 @@ void request_interrupt(struct i8080 *cpu, uint8_t *memory, uint8_t RST_n) {
 }
 
 void execute_instruction(struct i8080 *cpu, uint8_t *memory, void (*out)(uint8_t,uint8_t)) {
-	// TODO DCR does not set AC flag at all
+	// TODO many instructions do not set AC flag at all
 #define SWAP(x,y) {x^=y;y^=x;x^=y;}
 #define D16 (b[2] << 8 | b[1])
 #define gBC rpBC(cpu)
@@ -79,6 +79,16 @@ void execute_instruction(struct i8080 *cpu, uint8_t *memory, void (*out)(uint8_t
 
 #define XRA(x) {cpu->A^=x; fZ(cpu->A); fS(cpu->A); fP(cpu->A); setFlag(cpu, CY, 0); setFlag(cpu, AC, 0);}
 #define ANA(x) {cpu->A&=x; fZ(cpu->A); fS(cpu->A); fP(cpu->A); setFlag(cpu, CY, 0); /* TODO AC */}
+#define ADD(x) {\
+	setFlag(cpu, CY, cpu->A > 255 - x);\
+	cpu->A += x;\
+	fZ(cpu->A); fS(cpu->A); fP(cpu->A);\
+}
+#define ADC(x) {\
+	const uint16_t sum = cpu->A + x + getFlag(cpu, CY); \
+	setFlag(cpu, CY, sum > 255); \
+	fZ(cpu->A); fS(cpu->A); fP(cpu->A); \
+}
 
 	uint8_t* b = memory + cpu->pc;
 	// setFlag(cpu, CY, cpu->B == 0); // will result in a borrow
@@ -107,7 +117,7 @@ void execute_instruction(struct i8080 *cpu, uint8_t *memory, void (*out)(uint8_t
 			setFlag(cpu, CY, bit);
 			cpu->pc += 1;
 			break;
-		case 0x10: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*DEB*/	case 0x10: printf("DEB\n"); cpu->pc += 1; break;
 /*LXI*/	case 0x11: cpu->D = b[2]; cpu->E = b[1]; cpu->pc += 3; break;
 		case 0x12: unimplemented(cpu, memory); cpu->pc += 1; break;
 /*INX*/	case 0x13: sDE(gDE+1); cpu->pc += 1; break;
@@ -230,22 +240,24 @@ void execute_instruction(struct i8080 *cpu, uint8_t *memory, void (*out)(uint8_t
 /*MOV*/	case 0x7e: cpu->A = memory[gHL]; cpu->pc += 1; break;
 /*MOV*/	case 0x7f: cpu->A = cpu->A;      cpu->pc += 1; break; // WTF why is this needed
 
-		case 0x80: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x81: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x82: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x83: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x84: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x85: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x86: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x87: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x88: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x89: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x8a: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x8b: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x8c: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x8d: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x8e: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0x8f: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*ADD*/	case 0x80: ADD(cpu->B     ); cpu->pc += 1; break;
+/*ADD*/	case 0x81: ADD(cpu->C     ); cpu->pc += 1; break;
+/*ADD*/	case 0x82: ADD(cpu->D     ); cpu->pc += 1; break;
+/*ADD*/	case 0x83: ADD(cpu->E     ); cpu->pc += 1; break;
+/*ADD*/	case 0x84: ADD(cpu->H     ); cpu->pc += 1; break;
+/*ADD*/	case 0x85: ADD(cpu->L     ); cpu->pc += 1; break;
+/*ADD*/	case 0x86: ADD(memory[gHL]); cpu->pc += 1; break;
+/*ADD*/	case 0x87: ADD(cpu->A     ); cpu->pc += 1; break;
+
+/*ADC*/	case 0x88: ADC(cpu->B     ); cpu->pc += 1; break;
+/*ADC*/	case 0x89: ADC(cpu->C     ); cpu->pc += 1; break;
+/*ADC*/	case 0x8a: ADC(cpu->D     ); cpu->pc += 1; break;
+/*ADC*/	case 0x8b: ADC(cpu->E     ); cpu->pc += 1; break;
+/*ADC*/	case 0x8c: ADC(cpu->H     ); cpu->pc += 1; break;
+/*ADC*/	case 0x8d: ADC(cpu->L     ); cpu->pc += 1; break;
+/*ADC*/	case 0x8e: ADC(memory[gHL]); cpu->pc += 1; break;
+/*ADC*/	case 0x8f: ADC(cpu->A     ); cpu->pc += 1; break;
+
 		case 0x90: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0x91: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0x92: unimplemented(cpu, memory); cpu->pc += 1; break;
@@ -263,23 +275,23 @@ void execute_instruction(struct i8080 *cpu, uint8_t *memory, void (*out)(uint8_t
 		case 0x9e: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0x9f: unimplemented(cpu, memory); cpu->pc += 1; break;
 
-/*ANA*/	case 0xa0: ANA(cpu->B);      cpu->pc += 1; break;
-/*ANA*/	case 0xa1: ANA(cpu->C);      cpu->pc += 1; break;
-/*ANA*/	case 0xa2: ANA(cpu->D);      cpu->pc += 1; break;
-/*ANA*/	case 0xa3: ANA(cpu->E);      cpu->pc += 1; break;
-/*ANA*/	case 0xa4: ANA(cpu->H);      cpu->pc += 1; break;
-/*ANA*/	case 0xa5: ANA(cpu->L);      cpu->pc += 1; break;
+/*ANA*/	case 0xa0: ANA(cpu->B     ); cpu->pc += 1; break;
+/*ANA*/	case 0xa1: ANA(cpu->C     ); cpu->pc += 1; break;
+/*ANA*/	case 0xa2: ANA(cpu->D     ); cpu->pc += 1; break;
+/*ANA*/	case 0xa3: ANA(cpu->E     ); cpu->pc += 1; break;
+/*ANA*/	case 0xa4: ANA(cpu->H     ); cpu->pc += 1; break;
+/*ANA*/	case 0xa5: ANA(cpu->L     ); cpu->pc += 1; break;
 /*ANA*/	case 0xa6: ANA(memory[gHL]); cpu->pc += 1; break;
-/*ANA*/	case 0xa7: ANA(cpu->A);      cpu->pc += 1; break;
+/*ANA*/	case 0xa7: ANA(cpu->A     ); cpu->pc += 1; break;
 
-/*XRA*/	case 0xa8: XRA(cpu->B);      cpu->pc += 1; break;
-/*XRA*/	case 0xa9: XRA(cpu->C);      cpu->pc += 1; break;
-/*XRA*/	case 0xaa: XRA(cpu->D);      cpu->pc += 1; break;
-/*XRA*/	case 0xab: XRA(cpu->E);      cpu->pc += 1; break;
-/*XRA*/	case 0xac: XRA(cpu->H);      cpu->pc += 1; break;
-/*XRA*/	case 0xad: XRA(cpu->L);      cpu->pc += 1; break;
+/*XRA*/	case 0xa8: XRA(cpu->B     ); cpu->pc += 1; break;
+/*XRA*/	case 0xa9: XRA(cpu->C     ); cpu->pc += 1; break;
+/*XRA*/	case 0xaa: XRA(cpu->D     ); cpu->pc += 1; break;
+/*XRA*/	case 0xab: XRA(cpu->E     ); cpu->pc += 1; break;
+/*XRA*/	case 0xac: XRA(cpu->H     ); cpu->pc += 1; break;
+/*XRA*/	case 0xad: XRA(cpu->L     ); cpu->pc += 1; break;
 /*XRA*/	case 0xae: XRA(memory[gHL]); cpu->pc += 1; break;
-/*XRA*/	case 0xaf: XRA(cpu->A);      cpu->pc += 1; break;
+/*XRA*/	case 0xaf: XRA(cpu->A     ); cpu->pc += 1; break;
 
 		case 0xb0: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xb1: unimplemented(cpu, memory); cpu->pc += 1; break;
@@ -318,7 +330,7 @@ void execute_instruction(struct i8080 *cpu, uint8_t *memory, void (*out)(uint8_t
 		cpu->pc += 2;
 		break;
 /*RST*/	case 0xc7: RST(0); break;
-		case 0xc8: unimplemented(cpu, memory); cpu->pc += 1; break;
+/*RZ*/	case 0xc8: if(getFlag(cpu, Z) == 0) break; // else, waterfall to RET
 /*RET*/	case 0xc9:
 			cpu->pc = ((uint16_t)memory[cpu->sp+1] << 8) | memory[cpu->sp];
 			cpu->sp += 2;
@@ -417,7 +429,7 @@ void execute_instruction(struct i8080 *cpu, uint8_t *memory, void (*out)(uint8_t
 /*RST*/	case 0xf7: RST(6); break;
 		case 0xf8: unimplemented(cpu, memory); cpu->pc += 1; break;
 		case 0xf9: unimplemented(cpu, memory); cpu->pc += 1; break;
-		case 0xfa: unimplemented(cpu, memory); cpu->pc += 3; break;
+/*JM*/	case 0xfa: if(getFlag(cpu, S)) cpu->pc = D16; break;
 /*EI*/	case 0xfb: setFlag(cpu, EI, 1); cpu->pc += 1; break;
 		case 0xfc: unimplemented(cpu, memory); cpu->pc += 3; break;
 		case 0xfd: unimplemented(cpu, memory); cpu->pc += 1; break;
